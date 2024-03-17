@@ -1,4 +1,5 @@
 import numpy as np
+import cvxopt as opt
 
 
 def rho(X, Y, mu):
@@ -6,12 +7,12 @@ def rho(X, Y, mu):
     Evaluate the function rho(X_i, Y_i) for each pair (X_i, Y_i) between X and Y.
 
     Parameters:
-    - X (numpy.ndarray): Array of shape (nx, n) containing the points X_i.
-    - Y (numpy.ndarray): Array of shape (ny, n) containing the points Y_i.
-    - mu (float): Parameter of rho.
+        X (numpy.ndarray): Array of shape (nx, n) containing the points X_i.
+        Y (numpy.ndarray): Array of shape (ny, n) containing the points Y_i.
+        mu (float): Parameter of rho.
 
     Returns:
-    - numpy.ndarray: Array of shape (nx, ny) containing the pairwise evaluation.
+        numpy.ndarray: Array of shape (nx, ny) containing the pairwise evaluation.
 
     """
     _, n = X.shape
@@ -35,10 +36,10 @@ def rho_partial_derivative(X, Y, mu, k):
     for all pairs (X_i, Y_j)  of rows of matrices X and Y.
 
     Parameters:
-    - X (numpy.ndarray): Array of shape (nx, n) containing the points X_i.
-    - Y (numpy.ndarray): Array of shape (ny, n) containing the points Y_i.
-    - mu (float): Parameter of rho.
-    - k (int): Index for the partial derivative (1 <= k < n)
+        X (numpy.ndarray): Array of shape (nx, n) containing the points X_i.
+        Y (numpy.ndarray): Array of shape (ny, n) containing the points Y_i.
+        mu (float): Parameter of rho.
+        k (int): Index for the partial derivative (1 <= k < n)
 
     Returns:
         numpy.ndarray: Array of shape (nx, ny) containing the pairwise evaluation.
@@ -69,14 +70,14 @@ def rho_second_order_partial_derivative(X, Y, mu, k, q=None):
     for all pairs (X_i, Y_j) of rows of matrices X and Y.
 
     Parameters:
-    - X (numpy.ndarray): Array of shape (nx, n) containing the points X_i.
-    - Y (numpy.ndarray): Array of shape (ny, n) containing the points Y_i.
-    - mu (float): Parameter of rho.
-    - k: Index for the partial derivative (1 <= k <= n)
-    - q: Index for the second variable in the mixed partial derivative (1 <= q <= n), optional
+        X (numpy.ndarray): Array of shape (nx, n) containing the points X_i.
+        Y (numpy.ndarray): Array of shape (ny, n) containing the points Y_i.
+        mu (float): Parameter of rho.
+        k: Index for the partial derivative (1 <= k <= n)
+        q: Index for the second variable in the mixed partial derivative (1 <= q <= n), optional
 
     Returns:
-    - numpy.ndarray: Array of shape (nx, ny) containing the pairwise evaluation.
+        numpy.ndarray: Array of shape (nx, ny) containing the pairwise evaluation.
     """
     _, n = X.shape
 
@@ -114,16 +115,16 @@ def mse(p1, p2, T, x_dim, R, n_t, n_x):
     over the temporal domain [0, T] and spatial domain R^n.
 
     Parameters:
-    - p1 (function): First function p1(t, x).
-    - p2 (function): Second function p2(t, x).
-    - T (float): Upper limit of the temporal domain.
-    - x_dim (int): Dimension of the spatial domain.
-    - R (float): Spatial domain range.
-    - n_t (int): Number of points in the temporal domain.
-    - n_x (int): Number of points in the spatial domain.
+        p1 (function): First function p1(t, x).
+        p2 (function): Second function p2(t, x).
+        T (float): Upper limit of the temporal domain.
+        x_dim (int): Dimension of the spatial domain.
+        R (float): Spatial domain range.
+        n_t (int): Number of points in the temporal domain.
+        n_x (int): Number of points in the spatial domain.
 
     Returns:
-    - float: L2 norm of the difference between p1 and p2.
+        float: L2 norm of the difference between p1 and p2.
     """
 
     # Generate n_t points t in [0, T]
@@ -164,3 +165,73 @@ def cartesian_products_of_rows(A, B):
     B_tiled = np.tile(B, (A.shape[0], 1))
     cartesian_product = np.hstack((A_repeated, B_tiled))
     return cartesian_product
+
+
+def metropolis_hastings(p, n_sample, n_iter, n, scale=2.0):
+    """
+    Implements the Metropolis-Hastings algorithm to sample from a probability distribution
+    defined by the density function `p`.
+
+    Parameters:
+        p (function): Probability density function of the target distribution.
+        n_sample (int): Number of samples to be collected.
+        n_iter (int): Total number of iterations, including the burn-in period.
+        n (int): Dimensionality of the space from which samples are drawn.
+        scale (float, optional): Scale of the normal distribution used for proposing new points. Default is 2.0.
+
+    Returns:
+        numpy.ndarray: An array of shape `(n_sample, n)` containing the sampled points.
+    Implements the Metropolis-Hastings algorithm to sample from a given probability
+    distribution defined by a density function `p`.
+    """
+    x = np.zeros((n_iter, n))  # Initialize x with zeros
+    current_x = np.random.normal(size=n)  # Start at a random position
+
+    for i in range(1, n_iter):
+        current_p = p(current_x)
+
+        # Propose a new position.
+        proposed_x = current_x + np.random.normal(size=n, scale=scale)
+        proposed_p = p(proposed_x)
+
+        # Acceptance probability.
+        accept = proposed_p / current_p
+
+        if accept > np.random.rand():
+            current_x = proposed_x
+
+        x[i] = current_x
+
+    x = x[-n_sample:]
+
+    return x
+
+
+def qp_solver(A, b):
+    """
+    Solves a quadratic programming problem of the form min(0.5 * x.T * A * x + b.T * x)
+    subject to x >= 0, using the CVXOPT library.
+
+    Parameters:
+        A (numpy.ndarray): The quadratic coefficient matrix of shape (n, n), where n is the number of variables.
+        b (numpy.ndarray): The linear coefficient vector of shape (n,).
+
+    Returns:
+        numpy.ndarray: The solution vector of shape (n, ) that minimizes the quadratic program.
+    """
+
+    # Convert A, b to CVXOPT matrices
+    P = opt.matrix(2 * A)
+    q = opt.matrix(b)
+
+    # Define the inequality constraints (Gx <= h)
+    n = b.size
+    G = opt.matrix(-np.eye(n))
+    h = opt.matrix(np.zeros((n, 1)))
+
+    # Solve the quadratic program
+    opt.solvers.options["show_progress"] = False
+    solution = opt.solvers.qp(P, q, G, h)
+    solution = np.array(solution["x"]).flatten()
+
+    return solution

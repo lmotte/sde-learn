@@ -123,6 +123,37 @@ def dubins(v, theta, sigma):
     return b, sigma_func
 
 
+def gaussian(t1, x1, t2, x2, t3, x3, g):
+    """
+    Returns functions for Gaussian drift and diffusion coefficients based on the provided mean times, positions, and
+     multiplicative constant.
+
+    Parameters:
+        t1, t2, t3 (float): Mean times for the Gaussian components.
+        x1, x2, x3 (ndarray): Mean positions for the Gaussian components.
+        g (float): Multiplicative constant.
+
+    Returns:
+        tuple: A tuple containing the drift and diffusion coefficient functions.
+    """
+
+    def b(t, x):
+        b1 = np.exp(-g * np.linalg.norm(x - x1) * np.linalg.norm(t - t1))
+        b2 = np.exp(-g * np.linalg.norm(x - x2) * np.linalg.norm(t - t2))
+        b3 = np.exp(-g * np.linalg.norm(x - x3) * np.linalg.norm(t - t3))
+        bs = b1 * np.array([1, 0]) + b2 * np.array([0, 1]) + b3 * np.array([-1, 1])
+        return 10 * bs
+
+    def sigma_func(t, x):
+        s1 = np.exp(-g * np.linalg.norm(x - x1) * np.linalg.norm(t - t1))
+        s2 = np.exp(-g * np.linalg.norm(x - x2) * np.linalg.norm(t - t2))
+        s3 = np.exp(-g * np.linalg.norm(x - x3) * np.linalg.norm(t - t3))
+        ss = s1 + s2 + s3
+        return 0.2 * ss
+
+    return b, sigma_func
+
+
 def van_der_pol(mu, sigma):
     """
     Returns the drift and diffusion coefficients for the Van der Pol oscillator.
@@ -148,9 +179,17 @@ def plot_paths_1d(T, paths, save_path):
     """
     Plot 1-dimensional sample paths.
 
+    This function generates a plot of 1-dimensional sample paths over a specified
+    time interval. Each path is plotted with a slight transparency to visualize overlap
+    and divergence among paths. The plot is then saved to a specified file path.
+
     Parameters:
         T (numpy.ndarray): Array of shape (n_steps,) containing the times of discretization.
+                           This represents the time points at which the paths are evaluated.
         paths (numpy.ndarray): Array of shape (n_paths, n_steps, n) containing the simulated paths.
+                               Each path represents a possible evolution over time, where `n_paths`
+                               is the number of paths, `n_steps` is the number of time steps, and `n`
+                               should be 1 for 1D paths.
         save_path (str): File path where the plot will be saved.
     """
 
@@ -171,7 +210,7 @@ def plot_paths_1d(T, paths, save_path):
 
 def plot_paths_2d(paths, save_path):
     """
-    Plot 2-dimensional sample paths
+    Plot 2-dimensional sample paths.
 
     Parameters:
         paths (numpy.ndarray): Array of shape (n_paths, n_steps, 2) containing the simulated paths.
@@ -385,21 +424,25 @@ def plot_map_2d(
 
     fig, ax = plt.subplots(figsize=(8, 5))
     cmap = plt.cm.get_cmap("viridis")
-    norm = colors.Normalize(min(Ts), max(Ts)) if norm_bar is None else norm_bar
 
     # Compute time indices to plot for the map. Handle single or multiple time points.
     time_indices = [0] if len(Ts) == 1 else np.linspace(0, len(Ts) - 1, 10, dtype=int)
+
+    # Compute minimum and maximum time
+    t_min, t_max = Ts[0][0], Ts[-1][0]
 
     # Compute time indices to plot for the set (T_plot, X_plot).
     idx_plot = None
     if T_plot is not None:
         idx_plot = np.linspace(0, len(T_plot) - 1, 10, dtype=int)
         idx_plot = (idx_plot + idx_plot[1] // 2)[:-1]
+        t_min = np.min([Ts[0][0], T_plot[0][0]])
+        t_max = np.max([Ts[-1][0], T_plot[-1][0]])
 
     for i in range(len(time_indices)):
         # Plot the map x1, x2 -> map(T_plot(idx_plot(i), x1, x2).
         idx_t = time_indices[i]
-        t = Ts[idx_t]
+        t = Ts[idx_t][0]
         x, y = np.meshgrid(X1s, X2s)
         z = map_v[idx_t].reshape(x.shape).T
 
@@ -409,13 +452,13 @@ def plot_map_2d(
 
         if not fixed_t:
             plot_levels = sorted(levels)[-8:]
-            col_ratio = (t - Ts[0]) / (Ts[-1] - Ts[0])
+            col_ratio = (t - t_min) / (t_max - t_min)
             cmap_i = LinearSegmentedColormap.from_list(
                 "custom_cmap", [(1, 1, 1, 1), cmap(col_ratio)], N=num_levels
             )
         else:
             plot_levels = plot_levels if plot_levels is not None else sorted(levels)
-            norm = (
+            norm_bar = (
                 norm_bar if norm_bar is not None else colors.Normalize(z.min(), z.max())
             )
             cmap_i = cmap
@@ -436,8 +479,8 @@ def plot_map_2d(
         # Optionally plot scatter points for specific time indices if T_plot and X_plot are provided.
         if idx_plot is not None and i < len(idx_plot):
             idx_t_plot = idx_plot[i]
-            t_plot = T_plot[idx_t_plot]
-            col_plot = float((t_plot - Ts[0]) / (Ts[-1] - Ts[0]))
+            t_plot = T_plot[idx_t_plot][0]
+            col_plot = (t_plot - t_min) / (t_max - t_min)
             plt.scatter(
                 X_plot[:, idx_t_plot, 0],
                 X_plot[:, idx_t_plot, 1],
@@ -446,6 +489,7 @@ def plot_map_2d(
             )
 
     # Set labels, title, color bar, and save.
+    norm = colors.Normalize(t_min, t_max) if norm_bar is None else norm_bar
     ax.set(xlabel=xlabel, ylabel=ylabel, title=title, aspect="equal")
     fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, label=alt_label)
     plt.savefig(save_path + f"{name}.pdf")
@@ -454,7 +498,24 @@ def plot_map_2d(
     return plot_levels, norm
 
 
-def simple_plot(Ts, values, save_path, title, xlabel="t", ylabel=""):
+def line_plot(Ts, values, save_path, title, xlabel="t", ylabel=""):
+    """
+    Creates and saves a line plot.
+
+    Parameters:
+    Ts : array-like
+        X-values for the plot.
+    values : array-like
+        Y-values for each x-value in `Ts`.
+    save_path : str
+        Path including filename and extension where the plot is saved.
+    title : str
+        Plot title.
+    xlabel : str, optional
+        X-axis label (default is "t").
+    ylabel : str, optional
+        Y-axis label (default is empty).
+    """
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(Ts, values)
     ax.set(xlabel=xlabel, ylabel=ylabel, title=title)

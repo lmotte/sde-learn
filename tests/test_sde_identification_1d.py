@@ -8,7 +8,7 @@ from utils.data import (
     ornstein_uhlenbeck_pdf,
     plot_map_1d,
     plot_paths_1d,
-    simple_plot,
+    line_plot,
 )
 
 # Simulation parameters.
@@ -92,12 +92,12 @@ def p(Ts, X, partial):
     return kde.predict(Ts, X, partial=partial)
 
 
-estimator.fit(T_fp=T_fp, X_fp=X_fp, p=p)
+estimator.fit(T_tr=T_fp, X_tr=X_fp, p=p)
 
 # Compute MSE of the FP fitting on the train and test sets.
-_, _, MSE_tr_test = estimator.compute_mse_tr()
-d_p_te_kolmogorov, d_p_te_direct, MSE_te, norms = estimator.compute_mse_te(T_te, X_te)
-print(f"Fokker-Planck train MSE : {MSE_tr_test}")
+_, _, MSE_tr, _ = estimator.compute_mse()
+d_p_te_kolmogorov, d_p_te_direct, MSE_te, norms = estimator.compute_mse(T_te, X_te)
+print(f"Fokker-Planck train MSE : {MSE_tr}")
 print(f"Fokker-Planck test MSE : {MSE_te}")
 print(f"Target mean squared norm: {norms[1]}")
 print(f"Prediction mean squared norm: {norms[0]}")
@@ -361,8 +361,8 @@ plot_map_1d(
 
 # Generate a set of sample paths from the SDE associated to the estimated coefficients (b, sigma).
 print("Start sampling")
-n_paths = 10
-n_steps = 30
+n_paths = 100
+n_steps = 100
 
 
 def b(t, x):
@@ -398,9 +398,9 @@ plot_paths_1d(T_samp, paths_pos, save_path=save_path)
 mean_pos = np.mean(paths_pos, axis=0)
 std_pos = np.std(paths_pos, axis=0)
 save_path = "../plots/test_sde_identification_1d/mean_pos.pdf"
-simple_plot(T_samp, mean_pos, save_path, title=r"$\hat \mu(t)$")
+line_plot(T_samp, mean_pos, save_path, title=r"$\hat \mu(t)$")
 save_path = "../plots/test_sde_identification_1d/std_pos.pdf"
-simple_plot(T_samp, std_pos, save_path, title=r"$\hat \sigma(t)$")
+line_plot(T_samp, std_pos, save_path, title=r"$\hat \sigma(t)$")
 
 # Compute and plot mean and variance of true SDE w.r.t. time.
 mean_true = np.exp(-theta * T_samp) * (mean_0 - mu) + mu
@@ -410,7 +410,7 @@ var_true = (sigma**2 / (2 * theta)) * (1 - np.exp(-2 * theta * T_samp)) + np.exp
 std_true = var_true ** (1 / 2)
 save_path = "../plots/test_sde_identification_1d/mean_true.pdf"
 title = r"$\mu(t)$"
-simple_plot(T_samp, mean_true, save_path, title)
+line_plot(T_samp, mean_true, save_path, title)
 save_path = "../plots/test_sde_identification_1d/std_true.pdf"
 title = r"$\sigma(t)$"
-simple_plot(T_samp, std_true, save_path, title)
+line_plot(T_samp, std_true, save_path, title)
