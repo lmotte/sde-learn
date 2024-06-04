@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from matplotlib import cm
 import matplotlib.pyplot as plt
@@ -374,7 +375,7 @@ def plot_map_1d(
             [legend1, legend2],
         )
 
-    plt.savefig(save_path + f"{save_name}.pdf")
+    plt.savefig(os.path.join(save_path, f"{save_name}.pdf"))
     plt.close(fig)
 
 
@@ -492,7 +493,7 @@ def plot_map_2d(
     norm = colors.Normalize(t_min, t_max) if norm_bar is None else norm_bar
     ax.set(xlabel=xlabel, ylabel=ylabel, title=title, aspect="equal")
     fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, label=alt_label)
-    plt.savefig(save_path + f"{name}.pdf")
+    plt.savefig(os.path.join(save_path, f"{name}.pdf"))
     plt.close(fig)
 
     return plot_levels, norm
