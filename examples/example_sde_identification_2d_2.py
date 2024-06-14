@@ -22,7 +22,7 @@ T = 10  # Ending time
 n_steps = 100  # Number of time steps
 dt = T / n_steps  # Time step
 T_tr = (np.arange(0, n_steps) * dt).reshape(-1, 1)  # Temporal discretization
-n_paths_tr = 2000  # Number of train paths to draw
+n_paths_tr = 3000  # Number of train paths to draw
 n_paths_te = 100  # Number of test paths to draw
 
 
@@ -48,10 +48,10 @@ kde.T = T
 
 
 # Choose the hyperparameters for the probability density estimator.
-gamma_t = 1e-0
-mu_x = 10
-L_t = 1e-5
-c_kernel = 1e-6
+gamma_t = 0.01
+L_t = 1e-06
+mu_x = 4.6415888336127775
+c_kernel = 1e-05
 kde.gamma_t = gamma_t
 kde.mu_x = mu_x
 kde.L_t = L_t
@@ -107,9 +107,9 @@ estimator = FPEstimator()
 
 
 # Choose the hyperparameters for the Fokker-Planck matching estimator.
-gamma_z = 1e-2
-c_kernel_z = 1e-6
-estimator.la = 1e-3
+gamma_z = 0.01
+c_kernel_z = 1e-5
+estimator.la = 1e-6
 estimator.be = (x_2_min - x_2_max) * (x_1_min - x_1_max)
 estimator.gamma_z = gamma_z
 estimator.T = T

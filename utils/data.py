@@ -155,6 +155,37 @@ def gaussian(t1, x1, t2, x2, t3, x3, g):
     return b, sigma_func
 
 
+def gaussian_2(t1, x1, t2, x2, t3, x3, g):
+    """
+    Returns functions for Gaussian drift and diffusion coefficients based on the provided mean times, positions, and
+     multiplicative constant.
+
+    Parameters:
+        t1, t2, t3 (float): Mean times for the Gaussian components.
+        x1, x2, x3 (ndarray): Mean positions for the Gaussian components.
+        g (float): Multiplicative constant.
+
+    Returns:
+        tuple: A tuple containing the drift and diffusion coefficient functions.
+    """
+
+    def b(t, x):
+        b1 = np.exp(-g * (np.linalg.norm(x - x1) ** 2 + np.linalg.norm(t - t1) ** 2))
+        b2 = np.exp(-g * (np.linalg.norm(x - x2) ** 2 + np.linalg.norm(t - t2) ** 2))
+        b3 = np.exp(-g * (np.linalg.norm(x - x3) ** 2 + np.linalg.norm(t - t3) ** 2))
+        bs = b1 * np.array([1, 0]) + b2 * np.array([0, 1]) + b3 * np.array([-1, 1])
+        return 10 * bs
+
+    def sigma_func(t, x):
+        s1 = np.exp(-g * (np.linalg.norm(x - x1) ** 2 + np.linalg.norm(t - t1) ** 2))
+        s2 = np.exp(-g * (np.linalg.norm(x - x2) ** 2 + np.linalg.norm(t - t2) ** 2))
+        s3 = np.exp(-g * (np.linalg.norm(x - x3) ** 2 + np.linalg.norm(t - t3) ** 2))
+        ss = s1 + s2 + s3
+        return 0.2 * ss
+
+    return b, sigma_func
+
+
 def van_der_pol(mu, sigma):
     """
     Returns the drift and diffusion coefficients for the Van der Pol oscillator.
@@ -202,20 +233,28 @@ def plot_paths_1d(T, paths, save_path):
             T, path[:, 0], label=f"Path {idx}", color="black", alpha=0.5, linewidth=1
         )
 
-    ax.set_xlabel("Time t")
-    ax.set_ylabel("X(t)")
-    ax.set_title("Sample Paths")
-    plt.savefig(save_path)
+    ax.set_xlabel("t", fontsize=16)
+    ax.set_ylabel("X(t)", fontsize=16)
+    ax.set_title("Sample paths", fontsize=18)
+    ax.tick_params(axis="both", which="major", labelsize=14)
+
+    # Set range for the axes
+    ax.set_ylim(-0.5, 4)
+    plt.savefig(save_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
-def plot_paths_2d(paths, save_path):
+def plot_paths_2d(paths, save_path, x_lim=None, y_lim=None):
     """
     Plot 2-dimensional sample paths.
 
     Parameters:
         paths (numpy.ndarray): Array of shape (n_paths, n_steps, 2) containing the simulated paths.
         save_path (str): File path where the plot will be saved.
+        x_lim (tuple of float, optional): A tuple specifying the (min, max) x-limits for the plot axes.
+         Use to fix the horizontal range of the plot.
+        y_lim (tuple of float, optional): A tuple specifying the (min, max) y-limits for the plot axes.
+         Use to fix the vertical range of the plot.
     """
 
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -235,7 +274,12 @@ def plot_paths_2d(paths, save_path):
     ax.set_ylabel("$X_2(t)$")
     ax.set_title("2D Sample Paths")
     ax.set_aspect("equal", adjustable="box")  # Ensure equal aspect ratio
-    plt.savefig(save_path)
+    # Set axis limits if specified
+    if x_lim:
+        ax.set_xlim(x_lim)
+    if y_lim:
+        ax.set_ylim(y_lim)
+    plt.savefig(save_path, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -264,7 +308,7 @@ def plot_coefficients(paths, coeffs, save_path):
     ax.set_xlabel("X(t)")
     ax.set_ylabel(r"b/$\sigma^2$(t, x(t))")
     ax.set_title("Coefficient values along paths")
-    plt.savefig(save_path)
+    plt.savefig(save_path, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -323,6 +367,7 @@ def plot_map_1d(
     legend1=None,
     legend2=None,
     save_path=None,
+    y_lim=None,
 ):
     """
     Plots the 1d values of maps f(t, x) for given data.
@@ -340,6 +385,8 @@ def plot_map_1d(
         legend1 (str, optional): Legend label for the first distribution. Required if `map2` is provided.
         legend2 (str, optional): Legend label for the second distribution. Required if `map2` is provided.
         save_path (str): File path where the plot will be saved.
+        y_lim (tuple of float, optional): A tuple specifying the (min, max) y-limits for the plot axes.
+         Use to fix the vertical range of the plot.
     """
 
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -360,10 +407,16 @@ def plot_map_1d(
             ax.scatter(X_flat, map2[i], s=20, c=[cmap(col)], label=f"t={t}")
 
     # Set labels, title, and color bar
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_title(title)
-    fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, label=alt_label)
+    ax.set_xlabel(xlabel, fontsize=18)
+    ax.set_ylabel(ylabel, fontsize=18)
+    ax.set_title(title, fontsize=18)
+    fig.colorbar(
+        cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, label=alt_label
+    ).set_label(alt_label, fontsize=18)
+
+    # Set range for the axes
+    if y_lim is not None:
+        ax.set_ylim(y_lim)
 
     # Handle legend for p1 and p2
     if map2 is not None:
@@ -373,9 +426,10 @@ def plot_map_1d(
                 plt.Line2D([0], [0], marker="o", color="black", lw=0, markersize=5),
             ],
             [legend1, legend2],
+            fontsize=18,
         )
 
-    plt.savefig(os.path.join(save_path, f"{save_name}.pdf"))
+    plt.savefig(os.path.join(save_path, f"{save_name}.pdf"), bbox_inches="tight")
     plt.close(fig)
 
 
@@ -395,6 +449,8 @@ def plot_map_2d(
     norm_bar=None,
     T_plot=None,
     X_plot=None,
+    x_lim=None,
+    y_lim=None,
 ):
     """
     Plots 2D values of maps f(t, x1, x2) for given data.
@@ -417,6 +473,10 @@ def plot_map_2d(
         If None, it is calculated. Defaults to None.
         T_plot (numpy.ndarray, optional): Times of points to scatter.
         X_plot (numpy.ndarray, optional): Positions of points to scatter.
+        x_lim (tuple of float, optional): A tuple specifying the (min, max) x-limits for the plot axes.
+         Use to fix the horizontal range of the plot.
+        y_lim (tuple of float, optional): A tuple specifying the (min, max) y-limits for the plot axes.
+         Use to fix the vertical range of the plot.
 
     Returns:
         plot_levels (list): The contour levels used in the plot.
@@ -475,7 +535,7 @@ def plot_map_2d(
             linewidths=0.1,
             linestyles="dashed",
         )
-        plt.plot(x, y, ".", ms=0.1, color="black")
+        # plt.plot(x, y, ".", ms=0.1, color="black")
 
         # Optionally plot scatter points for specific time indices if T_plot and X_plot are provided.
         if idx_plot is not None and i < len(idx_plot):
@@ -489,11 +549,24 @@ def plot_map_2d(
                 s=1,
             )
 
+    # Set axis limits if specified
+    if x_lim:
+        ax.set_xlim(x_lim)
+    if y_lim:
+        ax.set_ylim(y_lim)
+
     # Set labels, title, color bar, and save.
     norm = colors.Normalize(t_min, t_max) if norm_bar is None else norm_bar
     ax.set(xlabel=xlabel, ylabel=ylabel, title=title, aspect="equal")
-    fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, label=alt_label)
-    plt.savefig(os.path.join(save_path, f"{name}.pdf"))
+    ax.set_xlabel(xlabel, fontsize=18)
+    ax.set_ylabel(ylabel, fontsize=18)
+    cbar = fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, label=alt_label)
+    cbar.ax.tick_params(labelsize=18)
+    ax.tick_params(axis="both", which="major", labelsize=14)
+    # Set range for the axes
+    if y_lim is not None:
+        ax.set_ylim(y_lim)
+    plt.savefig(os.path.join(save_path, f"{name}.pdf"), bbox_inches="tight")
     plt.close(fig)
 
     return plot_levels, norm
@@ -520,5 +593,5 @@ def line_plot(Ts, values, save_path, title, xlabel="t", ylabel=""):
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(Ts, values)
     ax.set(xlabel=xlabel, ylabel=ylabel, title=title)
-    fig.savefig(save_path)
+    fig.savefig(save_path, bbox_inches="tight")
     plt.close(fig)

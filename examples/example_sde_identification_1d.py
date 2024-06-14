@@ -20,7 +20,7 @@ mean_0, std_0 = np.array([0.5] * n), sigma / (2 * theta) ** (
     1 / 2
 )  # Mean and std at t=0
 T = 10  # Ending time
-n_steps = 400  # Number of time steps
+n_steps = 100  # Number of time steps
 dt = T / n_steps  # Time step
 T_tr = (np.arange(0, n_steps) * dt).reshape(-1, 1)  # Temporal discretization
 n_paths = 2000  # Number of paths to draw
@@ -40,10 +40,10 @@ plot_paths_1d(T_tr, X_tr[:n_plot], save_path=save_path)
 kde = ProbaDensityEstimator()
 
 # Choose the hyperparameters for the probability density estimator.
-gamma_t = 1e-0
-L_t = 1e-6
-mu_x = 10
-c_kernel = 1e-5
+gamma_t = 1.0
+L_t = 0.00017782794100389227
+mu_x = 10.0
+c_kernel = 1e-05
 kde.gamma_t = gamma_t
 kde.mu_x = mu_x
 kde.L_t = L_t
@@ -71,9 +71,9 @@ p_true = ornstein_uhlenbeck_pdf(
 estimator = FPEstimator()
 
 # Choose the hyperparameters for the Fokker-Planck matching estimator.
-gamma_z = 1e-2
-c_kernel_z = 1e-2
-la = 1e-1
+gamma_z = 0.1
+c_kernel_z = 1e-05
+la = 1e-05
 estimator.gamma_z = gamma_z
 estimator.la = la
 estimator.be = x_max - x_min

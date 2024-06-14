@@ -16,8 +16,6 @@ class FPEstimator:
     ----------
     la : float, optional
         Regularization parameter for ridge regression. Default is None.
-    be : float, optional
-        Bandwidth parameter for the kernel. Default is None.
     gamma_z : float, optional
         Parameter for the Radial Basis Function (RBF) kernel. Default is None.
     kde : callable, optional
@@ -82,11 +80,9 @@ class FPEstimator:
 
         # Parameters.
         self.la = None
-        self.be = None
         self.gamma_z = None
         self.kde = None
         self.c_kernel = None
-        self.mu = None
 
         # Attributes computed and save at train.
         self.T = None
@@ -144,7 +140,6 @@ class FPEstimator:
         self.d_2_P_tr = self.d_2_P_tr.reshape((self.n, self.n, -1, 1))
 
         # KRR fitting.
-        self.mu = self.n_z * self.la / (self.T * self.be)
         if nystrom == -1:
             # KRR standard fitting.
             self.fit_standard_krr()
@@ -178,7 +173,9 @@ class FPEstimator:
         )
 
         # Inversion.
-        K_tilde_inv = np.linalg.inv(K_tilde_tr + self.mu * np.eye(K_tilde_tr.shape[0]))
+        K_tilde_inv = np.linalg.inv(
+            K_tilde_tr + self.n_z * self.la * np.eye(K_tilde_tr.shape[0])
+        )
         print(f"Inversion time: {time.time() - t0}", flush=True)
 
         # KRR weights.
@@ -199,9 +196,9 @@ class FPEstimator:
         )
         K_pc_pc = K_tr_pc[self.idx_pc, :]
         A0 = R_s_tr_pc.T @ K_tilde_inv @ R_s_tr_pc
-        A = (self.mu**-1) * (K_pc_pc - A0)
+        A = (self.la**-1) * (K_pc_pc - A0)
         b = 2 * R_s_tr_pc.T @ K_tilde_inv @ d_t_P_tr
-        self.eps = qp_solver(A, b)
+        self.eps = (self.la**-1) * qp_solver(A, b)
         print(f"QP solving time: {time.time() - t0}", flush=True)
         self.alpha_pc = self.eps.T.dot(R_s_tr_pc.T).dot(K_tilde_inv)
 
@@ -246,7 +243,7 @@ class FPEstimator:
         # Inversion.
         M = np.linalg.inv(
             K_tilde_tr_ny.T.dot(K_tilde_tr_ny)
-            + self.mu * np.eye(K_tilde_ny_ny.shape[0])
+            + self.n_z * self.la * np.eye(K_tilde_ny_ny.shape[0])
         )
         print(f"Inversion time: {time.time() - t0}", flush=True)
 
@@ -380,10 +377,10 @@ class FPEstimator:
             S = self.alpha.dot(R_s_tr_te)
 
             # Compute predictions for KRR with positivity constraints.
-            add_B = -(1 / self.mu) * self.alpha_pc.dot(R_b_tr_te)
+            add_B = -self.alpha_pc.dot(R_b_tr_te)
 
-            add_S = (1 / self.mu) * (
-                self.eps.T.dot(K_tr_te[self.idx_pc, :]) - self.alpha_pc.dot(R_s_tr_te)
+            add_S = self.eps.T.dot(K_tr_te[self.idx_pc, :]) - self.alpha_pc.dot(
+                R_s_tr_te
             )
             B_pc = B + add_B
             S_pc = S + add_S
@@ -480,8 +477,8 @@ class FPEstimator:
             d_2_P_te,
         )
 
-        d_t_p_kolmogorov_add = (1 / self.mu) * (
-            self.eps.T.dot(R_s_te_pc.T) - self.alpha_pc.dot(K_tilde_te)
+        d_t_p_kolmogorov_add = self.eps.T.dot(R_s_te_pc.T) - self.alpha_pc.dot(
+            K_tilde_te
         )
         d_t_p_kolmogorov_te += d_t_p_kolmogorov_add.reshape((-1, 1))
 
@@ -681,18 +678,18 @@ class FPEstimator:
             for i in range(self.n):
                 for j in range(self.n):
                     for k in range(self.n):
-                        for l in range(self.n):
+                        for q in range(self.n):
                             K_kl_ij = (
                                 -2
                                 * self.gamma_z
                                 * (
-                                    -D_x[:, :, j] * d_3_K_1_2[k, l, i]
-                                    + (l == j) * d_2_K_1_2[i, k]
-                                    + (k == j) * d_2_K_1_2[i, l]
-                                    + (i == j) * d_2_K_1_2[k, l]
+                                    -D_x[:, :, j] * d_3_K_1_2[k, q, i]
+                                    + (q == j) * d_2_K_1_2[i, k]
+                                    + (k == j) * d_2_K_1_2[i, q]
+                                    + (i == j) * d_2_K_1_2[k, q]
                                 )
                             )
-                            d_4_K_1_2[k, l, i, j] = K_kl_ij
+                            d_4_K_1_2[k, q, i, j] = K_kl_ij
 
             return K_1_2, d_K_1_2, d_2_K_1_2, d_3_K_1_2, d_4_K_1_2
 
@@ -755,42 +752,42 @@ class FPEstimator:
             )
             tilde_K += tilde_K_i
 
-        # Add second order partial derivative terms
+        # # Add second order partial derivative terms
         for i in range(self.n):
-            for j in range(self.n):
-                for k in range(self.n):
-                    for l in range(self.n):
-                        d_i_K, d_j_K = d_K[i], d_K[j]
-                        d_k_K, d_l_K = d_K[k], d_K[l]
-                        d_ij_K, d_il_K = d_2_K[i, j], d_2_K[i, l]
-                        d_kl_K, d_ki_K = d_2_K[k, l], d_2_K[k, i]
-                        d_kj_K, d_jl_K = d_2_K[k, j], d_2_K[j, l]
-                        d_ki_j_K, d_kl_j_K = d_3_K[k, i, j], d_3_K[k, l, j]
-                        d_kl_i_K, d_li_j_K = d_3_K[k, l, i], d_3_K[l, i, j]
-                        d_kl_ij_K = d_4_K[k, l, i, j]
-                        d_k_P_1, d_l_P_1, d_kl_P_1 = d_P_1[k], d_P_1[l], d_2_P_1[k, l]
-                        d_i_P_2, d_j_P_2, d_ij_P_2 = d_P_2[i], d_P_2[j], d_2_P_2[i, j]
+            j = i
+            for k in range(self.n):
+                q = k
+                d_i_K, d_j_K = d_K[i], d_K[j]
+                d_k_K, d_l_K = d_K[k], d_K[q]
+                d_ij_K, d_il_K = d_2_K[i, j], d_2_K[i, q]
+                d_kl_K, d_ki_K = d_2_K[k, q], d_2_K[k, i]
+                d_kj_K, d_jl_K = d_2_K[k, j], d_2_K[j, q]
+                d_ki_j_K, d_kl_j_K = d_3_K[k, i, j], d_3_K[k, q, j]
+                d_kl_i_K, d_li_j_K = d_3_K[k, q, i], d_3_K[q, i, j]
+                d_kl_ij_K = d_4_K[k, q, i, j]
+                d_k_P_1, d_l_P_1, d_kl_P_1 = d_P_1[k], d_P_1[q], d_2_P_1[k, q]
+                d_i_P_2, d_j_P_2, d_ij_P_2 = d_P_2[i], d_P_2[j], d_2_P_2[i, j]
 
-                        tilde_K_kl_ij = (
-                            K * np.outer(d_kl_P_1, d_ij_P_2)
-                            + d_k_K * np.outer(d_l_P_1, d_ij_P_2)
-                            + d_l_K * np.outer(d_k_P_1, d_ij_P_2)
-                            + d_kl_K * np.outer(P_1, d_ij_P_2)
-                            + (-d_i_K) * np.outer(d_kl_P_1, d_j_P_2)
-                            + (-d_ki_K) * np.outer(d_l_P_1, d_j_P_2)
-                            + (-d_il_K) * np.outer(d_k_P_1, d_j_P_2)
-                            + d_kl_i_K * np.outer(P_1, d_j_P_2)
-                            + (-d_j_K) * np.outer(d_kl_P_1, d_i_P_2)
-                            + (-d_kj_K) * np.outer(d_l_P_1, d_i_P_2)
-                            + (-d_jl_K) * np.outer(d_k_P_1, d_i_P_2)
-                            + d_kl_j_K * np.outer(P_1, d_i_P_2)
-                            + d_ij_K * np.outer(d_kl_P_1, P_2)
-                            + (-d_ki_j_K) * np.outer(d_l_P_1, P_2)
-                            + (-d_li_j_K) * np.outer(d_k_P_1, P_2)
-                            + d_kl_ij_K * np.outer(P_1, P_2)
-                        )
+                tilde_K_kl_ij = (
+                    K * np.outer(d_kl_P_1, d_ij_P_2)
+                    + d_k_K * np.outer(d_l_P_1, d_ij_P_2)
+                    + d_l_K * np.outer(d_k_P_1, d_ij_P_2)
+                    + d_kl_K * np.outer(P_1, d_ij_P_2)
+                    + (-d_i_K) * np.outer(d_kl_P_1, d_j_P_2)
+                    + (-d_ki_K) * np.outer(d_l_P_1, d_j_P_2)
+                    + (-d_il_K) * np.outer(d_k_P_1, d_j_P_2)
+                    + d_kl_i_K * np.outer(P_1, d_j_P_2)
+                    + (-d_j_K) * np.outer(d_kl_P_1, d_i_P_2)
+                    + (-d_kj_K) * np.outer(d_l_P_1, d_i_P_2)
+                    + (-d_jl_K) * np.outer(d_k_P_1, d_i_P_2)
+                    + d_kl_j_K * np.outer(P_1, d_i_P_2)
+                    + d_ij_K * np.outer(d_kl_P_1, P_2)
+                    + (-d_ki_j_K) * np.outer(d_l_P_1, P_2)
+                    + (-d_li_j_K) * np.outer(d_k_P_1, P_2)
+                    + d_kl_ij_K * np.outer(P_1, P_2)
+                )
 
-                        tilde_K += (1 / 4) * tilde_K_kl_ij
+                tilde_K += (1 / 4) * tilde_K_kl_ij
 
         return tilde_K
 
@@ -830,12 +827,12 @@ class FPEstimator:
                 P_1, np.ones(n_2).T
             )
             R_b[i] = -R_te_b_i
-            for j in range(self.n):
-                d_j_P_1, d_ij_P_1 = d_P_1[j], d_2_P_1[i, j]
-                R_te_s_ij = K * np.outer(d_ij_P_1, np.ones(n_2).T)
-                R_te_s_ij += d_K[i] * np.outer(d_j_P_1, np.ones(n_2).T)
-                R_te_s_ij += d_K[j] * np.outer(d_i_P_1, np.ones(n_2).T)
-                R_te_s_ij += d_2_K[i, j] * np.outer(P_1, np.ones(n_2).T)
-                R_s += 1 / 2 * R_te_s_ij
+            j = i
+            d_j_P_1, d_ij_P_1 = d_P_1[j], d_2_P_1[i, j]
+            R_te_s_ij = K * np.outer(d_ij_P_1, np.ones(n_2).T)
+            R_te_s_ij += d_K[i] * np.outer(d_j_P_1, np.ones(n_2).T)
+            R_te_s_ij += d_K[j] * np.outer(d_i_P_1, np.ones(n_2).T)
+            R_te_s_ij += d_2_K[i, j] * np.outer(P_1, np.ones(n_2).T)
+            R_s += 1 / 2 * R_te_s_ij
 
         return R_b, R_s

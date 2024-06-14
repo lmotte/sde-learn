@@ -209,7 +209,7 @@ def metropolis_hastings(p, n_sample, n_iter, n, scale=2.0):
 
 def qp_solver(A, b):
     """
-    Solves a quadratic programming problem of the form min(0.5 * x.T * A * x + b.T * x)
+    Solves a quadratic programming problem of the form min(x.T * A * x + b.T * x)
     subject to x >= 0, using the CVXOPT library.
 
     Parameters:
