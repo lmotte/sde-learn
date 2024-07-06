@@ -1,4 +1,5 @@
 # sde-learn
+![License](https://img.shields.io/badge/License-MIT-black.svg)
 [![codecov](https://codecov.io/github/lmotte/sde-learn/graph/badge.svg?token=EIKWPA3U4I)](https://codecov.io/github/lmotte/sde-learn)
 
 ## Overview
