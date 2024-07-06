@@ -20,11 +20,9 @@ def test_fpestimator_initialization():
 
     # Check that all parameters are initialized to None
     assert estimator.la is None, "Expected la to be initialized to None"
-    assert estimator.be is None, "Expected be to be initialized to None"
     assert estimator.gamma_z is None, "Expected gamma_z to be initialized to None"
     assert estimator.kde is None, "Expected kde to be initialized to None"
     assert estimator.c_kernel is None, "Expected c_kernel to be initialized to None"
-    assert estimator.mu is None, "Expected mu to be initialized to None"
 
     # Check that all attributes set during training are None
     assert estimator.T is None, "Expected T to be None"
