@@ -280,8 +280,7 @@ class FPEstimator:
 
         This method constructs the training set `Z_tr` by taking the cartesian product of the time
         and spatial components of the training data. It then evaluates the probability density function `p`
-        and its derivatives at these points. The method supports both 2D and 3D spatial inputs, adjusting
-        the preparation process accordingly.
+        and its derivatives at these points.
 
         Parameters
         ----------
